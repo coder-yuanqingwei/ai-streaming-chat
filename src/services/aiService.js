@@ -67,7 +67,8 @@ function createThrottle(fn, interval = 32) {
  * @param {Function} onChunk - 接收到数据块的回调 (chunk, fullContent)
  * @param {Function} onDone - 完成时的回调
  * @param {Function} onError - 错误回调
- * @param {boolean} fastMode - 是否使用极速后端端点（测试用）
+ * @param {'mock'|'fast'|'llm'} mode - 模式：mock=模拟, fast=极速, llm=DeepSeek大模型
+ * @param {Array} messages - 完整对话历史（仅 llm 模式使用）
  */
 export async function streamChatMessage(
   message,
@@ -76,7 +77,8 @@ export async function streamChatMessage(
   onChunk,
   onDone,
   onError,
-  fastMode = false
+  mode = 'mock',
+  messages = []
 ) {
   // 创建节流器：高频 chunk 批量更新，最多 30fps
   const throttledUpdate = createThrottle((fullContent) => {
@@ -84,16 +86,28 @@ export async function streamChatMessage(
   }, 32);
 
   try {
-    const url = fastMode
-      ? `${API_BASE_URL}/chat/stream-fast`
-      : `${API_BASE_URL}/chat/stream`;
+    let url, body;
+
+    if (mode === 'llm') {
+      // DeepSeek 大模型模式：发送完整对话历史
+      url = `${API_BASE_URL}/chat/stream-llm`;
+      body = JSON.stringify({ messages, sessionId });
+    } else if (mode === 'fast') {
+      // 极速模拟模式
+      url = `${API_BASE_URL}/chat/stream-fast`;
+      body = JSON.stringify({ message, sessionId });
+    } else {
+      // 普通模拟模式
+      url = `${API_BASE_URL}/chat/stream`;
+      body = JSON.stringify({ message, sessionId });
+    }
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, sessionId }),
+      body,
       signal: controller.signal,
     });
 
@@ -132,6 +146,11 @@ export async function streamChatMessage(
               fullContent += data.content;
               // 节流更新：高频时批量，低频时即时
               throttledUpdate(fullContent);
+            } else if (data.type === 'error') {
+              fullContent += data.content;
+              throttledUpdate.flush(fullContent);
+              onError(new Error(data.content));
+              return;
             } else if (data.type === 'done') {
               throttledUpdate.flush(fullContent);
               onDone(fullContent);

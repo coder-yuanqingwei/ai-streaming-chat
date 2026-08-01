@@ -1,9 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useChatStore } from '../store/chatStore';
 
+// 模式配置
+const MODES = [
+  { value: 'mock', label: '模拟', color: 'gray', icon: '💬' },
+  { value: 'fast', label: '极速', color: 'orange', icon: '⚡' },
+  { value: 'llm', label: 'DeepSeek', color: 'blue', icon: '🤖' },
+];
+
 export default function MessageInput() {
   const [input, setInput] = useState('');
-  const [fastMode, setFastMode] = useState(false);
+  const [mode, setMode] = useState('mock');
   const textareaRef = useRef(null);
   const { sessions, activeSessionId, sendMessage, abortGeneration } =
     useChatStore();
@@ -25,7 +32,7 @@ export default function MessageInput() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!input.trim() || isGenerating) return;
-    sendMessage(input, fastMode);
+    sendMessage(input, mode);
     setInput('');
   };
 
@@ -45,6 +52,40 @@ export default function MessageInput() {
   return (
     <div className="border-t border-gray-200 p-4 bg-white">
       <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+        {/* 模式选择器 */}
+        <div className="flex items-center gap-1 mb-2.5">
+          <span className="text-xs text-gray-400 mr-1">模式</span>
+          <div className="inline-flex items-center rounded-lg bg-gray-100 p-0.5">
+            {MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setMode(m.value)}
+                disabled={isGenerating}
+                className={`
+                  px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1
+                  ${
+                    mode === m.value
+                      ? m.value === 'llm'
+                        ? 'bg-blue-500 text-white shadow-sm'
+                        : m.value === 'fast'
+                        ? 'bg-orange-500 text-white shadow-sm'
+                        : 'bg-white text-gray-700 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                `}
+              >
+                <span>{m.icon}</span>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {mode === 'llm' && (
+            <span className="text-xs text-blue-400 ml-1">需配置 API Key</span>
+          )}
+        </div>
+
         <div className="flex items-end gap-3">
           <div className="flex-1 relative">
             <textarea
@@ -102,27 +143,6 @@ export default function MessageInput() {
               </span>
             )}
           </p>
-
-          {/* 极速模式开关 */}
-          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-            <span className={fastMode ? 'text-orange-500 font-medium' : 'text-gray-400'}>
-              极速模式
-            </span>
-            <button
-              type="button"
-              onClick={() => setFastMode(!fastMode)}
-              disabled={isGenerating}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                fastMode ? 'bg-orange-500' : 'bg-gray-300'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                  fastMode ? 'translate-x-5' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </label>
         </div>
       </form>
     </div>

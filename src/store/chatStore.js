@@ -142,7 +142,7 @@ const useChatStore = create(
       },
 
       // ========== 发送消息（核心流程） ==========
-      sendMessage: async (content, fastMode = false) => {
+      sendMessage: async (content, mode = 'mock') => {
         const {
           sessions,
           activeSessionId,
@@ -161,6 +161,18 @@ const useChatStore = create(
 
         // 如果正在生成，不允许发送新消息
         if (session?.isGenerating) return;
+
+        // 构建发送给大模型的消息历史（仅 llm 模式需要）
+        const llmMessages =
+          mode === 'llm' && session
+            ? [
+                ...session.messages.map((msg) => ({
+                  role: msg.role,
+                  content: msg.content,
+                })),
+                { role: 'user', content },
+              ]
+            : [];
 
         // 1. 添加用户消息
         addMessage(sessionId, {
@@ -211,10 +223,11 @@ const useChatStore = create(
             },
             (error) => {
               console.error('生成出错:', error);
-              updateStreamingMessage(sessionId, '❌ 生成失败，请重试');
+              updateStreamingMessage(sessionId, error.message || '❌ 生成失败，请重试');
               setTimeout(() => finalizeStreamingMessage(sessionId), 2000);
             },
-            fastMode
+            mode,
+            llmMessages
           );
         } catch (error) {
           console.error('流式请求失败:', error);

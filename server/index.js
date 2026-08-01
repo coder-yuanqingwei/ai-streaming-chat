@@ -1,8 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import 'dotenv/config';
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
+
+// DeepSeek API 配置
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
 // 中间件
 app.use(cors());
@@ -186,13 +192,134 @@ app.post('/api/chat/stream-fast', async (req, res) => {
   console.log(`[极速] 会话 ${sessionId} 完成，共发送 ${characters.length} 个字符`);
 });
 
+// ========== DeepSeek 真实大模型端点 ==========
+app.post('/api/chat/stream-llm', async (req, res) => {
+  const { messages, sessionId } = req.body;
+
+  // 设置 SSE 响应头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  // 检查 API Key
+  if (!DEEPSEEK_API_KEY || DEEPSEEK_API_KEY === 'your_api_key_here') {
+    res.write(
+      `data: ${JSON.stringify({
+        type: 'error',
+        content: '❌ 未配置 DeepSeek API Key，请在 .env 文件中设置 DEEPSEEK_API_KEY',
+      })}\n\n`
+    );
+    res.write(`data: ${JSON.stringify({ type: 'done', content: '' })}\n\n`);
+    res.end();
+    return;
+  }
+
+  try {
+    console.log(`[DeepSeek] 会话 ${sessionId} 开始调用，消息数: ${messages?.length || 0}`);
+
+    // 调用 DeepSeek API（OpenAI 兼容格式）
+    const llmResponse = await fetch(DEEPSEEK_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages,
+        stream: true,
+      }),
+    });
+
+    if (!llmResponse.ok) {
+      const errText = await llmResponse.text();
+      console.error(`[DeepSeek] API 错误 ${llmResponse.status}:`, errText);
+      res.write(
+        `data: ${JSON.stringify({
+          type: 'error',
+          content: `❌ DeepSeek API 错误 (${llmResponse.status}): ${errText}`,
+        })}\n\n`
+      );
+      res.write(`data: ${JSON.stringify({ type: 'done', content: '' })}\n\n`);
+      res.end();
+      return;
+    }
+
+    // 读取 DeepSeek 的 SSE 流并转发给前端
+    const reader = llmResponse.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+
+        const jsonStr = trimmed.slice(6);
+        if (jsonStr === '[DONE]') {
+          res.write(`data: ${JSON.stringify({ type: 'done', content: '' })}\n\n`);
+          res.end();
+          console.log(`[DeepSeek] 会话 ${sessionId} 完成`);
+          return;
+        }
+
+        try {
+          const data = JSON.parse(jsonStr);
+          const content = data.choices?.[0]?.delta?.content || '';
+
+          if (content) {
+            res.write(
+              `data: ${JSON.stringify({ type: 'chunk', content })}\n\n`
+            );
+          }
+        } catch (e) {
+          // JSON 解析失败，跳过
+        }
+      }
+    }
+
+    // 如果流自然结束但没有收到 [DONE]
+    res.write(`data: ${JSON.stringify({ type: 'done', content: '' })}\n\n`);
+    res.end();
+    console.log(`[DeepSeek] 会话 ${sessionId} 完成`);
+  } catch (error) {
+    console.error('[DeepSeek] 调用失败:', error);
+    res.write(
+      `data: ${JSON.stringify({
+        type: 'error',
+        content: `❌ 调用 DeepSeek 失败: ${error.message}`,
+      })}\n\n`
+    );
+    res.write(`data: ${JSON.stringify({ type: 'done', content: '' })}\n\n`);
+    res.end();
+  }
+});
+
 // 健康检查
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
+  res.json({
+    status: 'ok',
+    timestamp: Date.now(),
+    deepseek: DEEPSEEK_API_KEY && DEEPSEEK_API_KEY !== 'your_api_key_here',
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 后端服务器运行在 http://localhost:${PORT}`);
-  console.log(`📡 普通 SSE: http://localhost:${PORT}/api/chat/stream`);
+  console.log(`📡 模拟 SSE: http://localhost:${PORT}/api/chat/stream`);
   console.log(`⚡ 极速 SSE: http://localhost:${PORT}/api/chat/stream-fast`);
+  console.log(`🤖 DeepSeek: http://localhost:${PORT}/api/chat/stream-llm`);
+  if (DEEPSEEK_API_KEY && DEEPSEEK_API_KEY !== 'your_api_key_here') {
+    console.log(`✅ DeepSeek API Key 已配置 (模型: ${DEEPSEEK_MODEL})`);
+  } else {
+    console.log(`⚠️  DeepSeek API Key 未配置，请在 .env 中设置 DEEPSEEK_API_KEY`);
+  }
 });
