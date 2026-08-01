@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: sans-serif;
+    height: 100vh;
+}
+
+#root {
+    height: 100vh;
+}
+
+/* ========== highlight.js 语法高亮主题（GitHub Dark） ========== */
+.hljs {
+    color: #e6edf3;
+    background: #0d1117;
+}
+
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+    color: #ff7b72;
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+    color: #d2a8ff;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector,
+.hljs-string,
+.hljs-char.escape_,
+.hljs-subst,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-title.class_.inherited__,
+.hljs-meta.string_ {
+    color: #a5d6ff;
+}
+
+.hljs-built_in,
+.hljs-class .hljs-title,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-regexp,
+.hljs-string,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+    color: #ffa657;
+}
+
+.hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+}
+
+.hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+}
+
+.hljs-comment,
+.hljs-meta {
+    color: #8b949e;
+}
+
+.hljs-punctuation {
+    color: #c9d1d9;
+}
+
+.hljs-emphasis {
+    font-style: italic;
+}
+
+.hljs-strong {
+    font-weight: bold;
+}
+
+/* ========== 代码块样式 ========== */
+.markdown-body pre {
+    background: #0d1117;
+    border-radius: 0 0 8px 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #e6edf3; /* 默认浅色文字，防止继承深色 */
+}
+
+.markdown-body pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+    /* 不设置 color: inherit，让 .hljs 的颜色生效 */
+}
+
+/* 确保 .hljs 基础颜色不被覆盖 */
+.markdown-body .hljs {
+    color: #e6edf3;
+    background: transparent;
+}
+
+/* ========== 行内代码 ========== */
+.markdown-body code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* ========== 表格滚动条美化 ========== */
+.markdown-body .overflow-x-auto::-webkit-scrollbar {
+    height: 6px;
+}
+
+.markdown-body .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
